@@ -4,3 +4,5 @@ version = "0.1.0"
 authors = ["Ryan P. Brewster <RyanPBrewster@gmail.com>"]
 
 [dependencies]
+rand = "0.4.2"
+termion = "1.5.1"
