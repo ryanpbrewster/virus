@@ -1,7 +1,8 @@
 extern crate termion;
 
-use termion::color::{Bg, Blue, Color, Green, Red, Reset, White};
-use termion::event::{Event, Key};
+use termion::color::{Bg, Blue, Green, Red, Reset, White};
+use termion::cursor;
+use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
@@ -10,6 +11,7 @@ use rand::{Rng, SeedableRng, XorShiftRng};
 
 use std::ops::{Index, IndexMut};
 use std::collections::VecDeque;
+use std::io::Write;
 
 struct Grid {
     elements: Vec<u8>,
@@ -46,21 +48,22 @@ impl Grid {
         }
     }
 
-    fn print(&self) {
-        print!("{}", termion::clear::All);
-        print!("{}", termion::cursor::Goto(1, 1));
+    fn print<W: Write>(&self, out: &mut W) {
+        write!(out, "{}", termion::clear::All).unwrap();
         for i in 0..self.num_rows {
+            write!(out, "{}", cursor::Goto(1, 1 + i as u16)).unwrap();
             for j in 0..self.num_cols {
                 match *self.index((i, j)) {
-                    b'r' => print!("{}  ", Bg(Red)),
-                    b'g' => print!("{}  ", Bg(Green)),
-                    b'b' => print!("{}  ", Bg(Blue)),
-                    b'w' => print!("{}  ", Bg(White)),
+                    b'r' => write!(out, "{}  ", Bg(Red)).unwrap(),
+                    b'g' => write!(out, "{}  ", Bg(Green)).unwrap(),
+                    b'b' => write!(out, "{}  ", Bg(Blue)).unwrap(),
+                    b'w' => write!(out, "{}  ", Bg(White)).unwrap(),
                     other => panic!("illegal color {}", other),
                 };
             }
-            println!("{}", Bg(Reset));
+            write!(out, "{}", Bg(Reset)).unwrap();
         }
+        out.flush().unwrap();
     }
 
     fn expand(&mut self, target: u8) {
@@ -98,7 +101,8 @@ impl Grid {
 
 fn main() {
     let stdin = std::io::stdin();
-    // let mut stdout = std::io::stdout().into_raw_mode().unwrap();
+    let mut stdout = std::io::stdout().into_raw_mode().unwrap();
+    write!(stdout, "{}", cursor::Hide).unwrap();
 
     let mut prng = XorShiftRng::from_seed([42, 42, 42, 42]);
     let mut grid: Grid = Grid::random(&mut prng, 10, 10);
@@ -106,7 +110,7 @@ fn main() {
 
     let mut history = Vec::new();
 
-    grid.print();
+    grid.print(&mut stdout);
     for c in stdin.keys() {
         let evt = c.unwrap();
         match evt {
@@ -125,11 +129,19 @@ fn main() {
             }
             _ => (),
         }
-        grid.print();
+        grid.print(&mut stdout);
         if grid.is_uniform() {
             break;
         }
     }
 
-    println!("{:?}", history);
+    write!(
+        stdout,
+        "{}{}{}{:?}{}",
+        termion::clear::All,
+        cursor::Goto(1, 1),
+        cursor::Show,
+        history,
+        cursor::Goto(1, 2)
+    ).unwrap();
 }
